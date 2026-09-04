@@ -4,12 +4,33 @@ using System.IO;
 using System.IO.Compression;
 using System.Text.Json;
 using System.Text;
+using System.Xml.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Button = System.Windows.Controls.Button;
+using Color = System.Windows.Media.Color;
+using DragEventArgs = System.Windows.DragEventArgs;
+using CheckBox = System.Windows.Controls.CheckBox;
+using ComboBox = System.Windows.Controls.ComboBox;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using MessageBox = System.Windows.MessageBox;
+using Point = System.Windows.Point;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using VerticalAlignment = System.Windows.VerticalAlignment;
+using Brushes = System.Windows.Media.Brushes;
+using DataFormats = System.Windows.DataFormats;
+using DragDropEffects = System.Windows.DragDropEffects;
+using DragDrop = System.Windows.DragDrop;
+using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
+using ColorConverter = System.Windows.Media.ColorConverter;
+using UglyToad.PdfPig;
 
 namespace Coursia;
 
@@ -22,9 +43,41 @@ public partial class MainWindow : Window
     private bool compactMode;
     private bool showFileExtensions;
     private readonly DispatcherTimer batteryTimer = new() { Interval = TimeSpan.FromSeconds(30) };
+    private readonly DispatcherTimer searchTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly System.Windows.Forms.NotifyIcon trayIcon;
+    private string? lastCourseNotification;
+    private readonly Dictionary<string, (DateTime LastWrite, string Text)> documentTextCache = new(StringComparer.OrdinalIgnoreCase);
+    private Guid? originalPowerScheme;
+    private const int CourseNotificationLeadMinutes = 15;
 
     [DllImport("kernel32.dll")]
     private static extern bool GetSystemPowerStatus(out SystemPowerStatus status);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetProcessInformation(IntPtr processHandle, int processInformationClass, ref ProcessPowerThrottlingState processInformation, int processInformationSize);
+
+    [DllImport("powrprof.dll", SetLastError = true)]
+    private static extern uint PowerGetActiveScheme(IntPtr userRootPowerKey, out IntPtr activePolicyGuid);
+
+    [DllImport("powrprof.dll", SetLastError = true)]
+    private static extern uint PowerSetActiveScheme(IntPtr userRootPowerKey, ref Guid schemeGuid);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr LocalFree(IntPtr memory);
+
+    private static readonly Guid WindowsPowerSaverScheme = new("a1841308-3541-4fab-bc81-f71556f20b4a");
+
+    private const int ProcessPowerThrottlingInformation = 4;
+    private const uint ProcessPowerThrottlingCurrentVersion = 1;
+    private const uint ProcessPowerThrottlingExecutionSpeed = 1;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ProcessPowerThrottlingState
+    {
+        public uint Version;
+        public uint ControlMask;
+        public uint StateMask;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct SystemPowerStatus
@@ -40,18 +93,46 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        trayIcon = new System.Windows.Forms.NotifyIcon { Visible = true, Text = "Coursia", Icon = LoadTrayIcon() };
         dataFile = Path.Combine(dataFolder, "library.json");
         LoadLibrary();
+        RegisterNotificationTask();
+        ImportSavedScheduleIfNeeded();
         compactMode = library.CompactMode;
         showFileExtensions = library.ShowFileExtensions;
         ApplySettings();
         ApplyPowerMode();
         UpdateBatteryStatus();
         batteryTimer.Tick += (_, _) => { UpdateBatteryStatus(); UpdateScheduleSummary(); };
+        searchTimer.Tick += (_, _) => { searchTimer.Stop(); RenderDocuments(); };
         batteryTimer.Start();
         RenderSections();
         RenderDocuments();
         UpdateScheduleSummary();
+    }
+
+    private void ImportSavedScheduleIfNeeded()
+    {
+        if (library.ScheduleParserVersion >= 4 || string.IsNullOrWhiteSpace(library.SchedulePdfPath) || !File.Exists(library.SchedulePdfPath)) return;
+        var scheduleWindow = new ScheduleWindow(library, SaveLibrary, UpdateScheduleSummary, ChooseStorageFolder);
+        scheduleWindow.Close();
+    }
+
+    private static void RegisterNotificationTask()
+    {
+        try
+        {
+            var executable = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(executable)) return;
+            var taskName = "Coursia\\Notifications de cours";
+            var arguments = $"/Create /SC MINUTE /MO 15 /TN \"{taskName}\" /TR \"\\\"{executable}\\\" --coursia-notify\" /F";
+            Process.Start(new ProcessStartInfo { FileName = "schtasks.exe", Arguments = arguments, CreateNoWindow = true, UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden })?.WaitForExit(3000);
+            var settingsCommand = "& { $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries; Set-ScheduledTask -TaskName 'Notifications de cours' -TaskPath '\\Coursia\\' -Settings $s }";
+            Process.Start(new ProcessStartInfo { FileName = "powershell.exe", Arguments = $"-NoProfile -NonInteractive -WindowStyle Hidden -Command \"{settingsCommand}\"", CreateNoWindow = true, UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden })?.WaitForExit(3000);
+        }
+        catch
+        {
+        }
     }
 
     private void LoadLibrary()
@@ -82,11 +163,25 @@ public partial class MainWindow : Window
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        if (library.TutorialSeen) return;
-        ShowTutorial();
-        library.TutorialSeen = true;
-        SaveLibrary();
+        if (string.IsNullOrWhiteSpace(library.UserName))
+        {
+            var nameDialog = new NameDialog("Bienvenue dans Coursia", "Comment veux-tu que Coursia t'appelle ?", "", profileOnly: true) { Owner = this };
+            if (nameDialog.ShowDialog() == true)
+            {
+                library.UserName = nameDialog.Value;
+                SaveLibrary();
+            }
+        }
+        UpdateGreeting();
+        if (!library.TutorialSeen)
+        {
+            ShowTutorial();
+            library.TutorialSeen = true;
+            SaveLibrary();
+        }
     }
+
+    private void UpdateGreeting() => GreetingText.Text = string.IsNullOrWhiteSpace(library.UserName) ? "Bonjour" : $"Bonjour, {library.UserName}";
 
     private void ShowTutorial()
     {
@@ -96,6 +191,7 @@ public partial class MainWindow : Window
 
     private void ApplySettings()
     {
+        AppIconText.Text = library.AppIcon;
         if (TryParseColor(library.AccentColor, out var color) && Resources["Blue"] is SolidColorBrush blueBrush)
         {
             blueBrush.Color = color;
@@ -111,7 +207,7 @@ public partial class MainWindow : Window
         BatteryIcon.Text = onBattery ? (percent <= 20 ? "▱" : "▰") : "⚡";
         BatteryIcon.Foreground = onBattery && percent <= 20 ? new SolidColorBrush(Color.FromRgb(244, 114, 94)) : new SolidColorBrush(Color.FromRgb(66, 211, 146));
         BatteryStatusText.Text = onBattery ? $"Batterie {percent}%" : "Secteur connecté";
-        PowerModeText.Text = library.PowerSavingMode ? "Mode économie activé" : "Mode économie désactivé";
+        PowerModeText.Text = library.PowerSavingMode ? "Économie active · contrôles ralentis" : "Mode économie désactivé";
     }
 
     private void PowerButton_Click(object sender, RoutedEventArgs e)
@@ -122,18 +218,66 @@ public partial class MainWindow : Window
         UpdateBatteryStatus();
     }
 
-    private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e) => batteryTimer.Stop();
+    private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        batteryTimer.Stop();
+        searchTimer.Stop();
+        RestoreWindowsPowerScheme();
+        trayIcon.Visible = false;
+        trayIcon.Dispose();
+    }
+
+    private System.Drawing.Icon LoadTrayIcon()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "icone.ico");
+        return File.Exists(path) ? new System.Drawing.Icon(path) : System.Drawing.SystemIcons.Application;
+    }
 
     private void ApplyPowerMode()
     {
+        batteryTimer.Interval = library.PowerSavingMode ? TimeSpan.FromMinutes(2) : TimeSpan.FromSeconds(30);
+        searchTimer.Interval = library.PowerSavingMode ? TimeSpan.FromMilliseconds(500) : TimeSpan.FromMilliseconds(250);
+        if (library.PowerSavingMode) documentTextCache.Clear();
         try
         {
             Process.GetCurrentProcess().PriorityClass = library.PowerSavingMode ? ProcessPriorityClass.BelowNormal : ProcessPriorityClass.Normal;
+            var throttling = new ProcessPowerThrottlingState
+            {
+                Version = ProcessPowerThrottlingCurrentVersion,
+                ControlMask = ProcessPowerThrottlingExecutionSpeed,
+                StateMask = library.PowerSavingMode ? ProcessPowerThrottlingExecutionSpeed : 0
+            };
+            SetProcessInformation(Process.GetCurrentProcess().Handle, ProcessPowerThrottlingInformation, ref throttling, Marshal.SizeOf<ProcessPowerThrottlingState>());
+            if (library.PowerSavingMode) EnableWindowsPowerSaver();
+            else RestoreWindowsPowerScheme();
         }
         catch
         {
         }
-        PowerModeText.Text = library.PowerSavingMode ? "Mode économie activé" : "Mode économie désactivé";
+        PowerModeText.Text = library.PowerSavingMode ? "Économie active · contrôles ralentis" : "Mode économie désactivé";
+    }
+
+    private void EnableWindowsPowerSaver()
+    {
+        if (originalPowerScheme is not null) return;
+        if (PowerGetActiveScheme(IntPtr.Zero, out var schemePointer) != 0 || schemePointer == IntPtr.Zero) return;
+        try
+        {
+            originalPowerScheme = Marshal.PtrToStructure<Guid>(schemePointer);
+            var powerSaverScheme = WindowsPowerSaverScheme;
+            PowerSetActiveScheme(IntPtr.Zero, ref powerSaverScheme);
+        }
+        finally
+        {
+            LocalFree(schemePointer);
+        }
+    }
+
+    private void RestoreWindowsPowerScheme()
+    {
+        if (originalPowerScheme is not Guid previousScheme) return;
+        PowerSetActiveScheme(IntPtr.Zero, ref previousScheme);
+        originalPowerScheme = null;
     }
 
     private static bool TryParseColor(string value, out Color color)
@@ -163,7 +307,9 @@ public partial class MainWindow : Window
 
     private void AddSectionButton(StudySection section, bool isSubsection)
     {
-        var button = new Button { Content = new TextBlock { Text = (isSubsection ? "   " : "") + section.Icon + "  " + section.Name, TextTrimming = TextTrimming.CharacterEllipsis }, Tag = section.Id, HorizontalContentAlignment = HorizontalAlignment.Left, Background = section.Id == selectedSectionId ? new SolidColorBrush(Color.FromRgb(42, 56, 80)) : Brushes.Transparent, Foreground = new SolidColorBrush(isSubsection ? Color.FromRgb(159, 174, 196) : Color.FromRgb(224, 231, 241)), Padding = new Thickness(10, 8, 10, 8), Margin = isSubsection ? new Thickness(14, 0, 0, 2) : new Thickness(0, 0, 0, 2), FontSize = isSubsection ? 12 : 13, ToolTip = "Ouvrir " + section.Name };
+        var button = new Button { Content = new TextBlock { Text = (isSubsection ? "   " : "") + section.Icon + "  " + section.Name, TextTrimming = TextTrimming.CharacterEllipsis }, Tag = section.Id, AllowDrop = true, HorizontalContentAlignment = HorizontalAlignment.Left, Background = section.Id == selectedSectionId ? new SolidColorBrush(Color.FromRgb(42, 56, 80)) : Brushes.Transparent, Foreground = new SolidColorBrush(isSubsection ? Color.FromRgb(159, 174, 196) : Color.FromRgb(224, 231, 241)), Padding = new Thickness(10, 8, 10, 8), Margin = isSubsection ? new Thickness(14, 0, 0, 2) : new Thickness(0, 0, 0, 2), FontSize = isSubsection ? 12 : 13, ToolTip = "Ouvrir " + section.Name + " ou déposer un fichier" };
+        button.DragOver += Section_DragOver;
+        button.Drop += Section_Drop;
         button.MouseEnter += (_, _) => { if (section.Id != selectedSectionId) button.Background = new SolidColorBrush(Color.FromRgb(32, 46, 67)); };
         button.MouseLeave += (_, _) => { if (section.Id != selectedSectionId) button.Background = Brushes.Transparent; };
         button.ContextMenu = CreateSectionMenu(section);
@@ -222,7 +368,7 @@ public partial class MainWindow : Window
     {
         BackToOverviewButton.Visibility = Visibility.Collapsed;
         var query = SearchBox?.Text?.Trim() ?? "";
-        var subjects = library.Sections.Where(section => section.ParentId is null).Where(section => string.IsNullOrWhiteSpace(query) || section.Name.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+        var subjects = library.Sections.Where(section => section.ParentId is null).Where(section => string.IsNullOrWhiteSpace(query) || SectionMatches(section, query) || library.Documents.Any(document => GetDescendantIds(section.Id).Contains(document.SectionId) && DocumentMatches(document, query))).ToList();
         CourseTitle.Text = "Mes matières";
         CourseCount.Text = $"{subjects.Count} matière{(subjects.Count > 1 ? "s" : "")}";
         if (subjects.Count == 0)
@@ -230,7 +376,7 @@ public partial class MainWindow : Window
             CourseCards.Children.Add(CreateEmptyStateButton());
         }
         foreach (var subject in subjects) CourseCards.Children.Add(CreateSectionCard(subject));
-        RenderRecentFiles(library.Documents);
+        RenderRecentFiles(library.Documents.Where(document => string.IsNullOrWhiteSpace(query) || DocumentMatches(document, query)));
     }
 
     private void RenderSectionContents()
@@ -240,8 +386,8 @@ public partial class MainWindow : Window
         BackToOverviewButton.Visibility = Visibility.Visible;
         var query = SearchBox?.Text?.Trim() ?? "";
         var sectionIds = GetDescendantIds(section.Id).ToHashSet();
-        var children = library.Sections.Where(item => item.ParentId == section.Id).Where(item => string.IsNullOrWhiteSpace(query) || item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
-        var documents = library.Documents.Where(document => sectionIds.Contains(document.SectionId)).Where(document => string.IsNullOrWhiteSpace(query) || document.Name.Contains(query, StringComparison.OrdinalIgnoreCase)).OrderByDescending(document => document.AddedAt).ToList();
+        var children = library.Sections.Where(item => item.ParentId == section.Id).Where(item => string.IsNullOrWhiteSpace(query) || SectionMatches(item, query) || library.Documents.Any(document => GetDescendantIds(item.Id).Contains(document.SectionId) && DocumentMatches(document, query))).ToList();
+        var documents = library.Documents.Where(document => sectionIds.Contains(document.SectionId)).Where(document => string.IsNullOrWhiteSpace(query) || DocumentMatches(document, query)).OrderByDescending(document => document.AddedAt).ToList();
         CourseTitle.Text = section.Name;
         CourseCount.Text = $"{children.Count + documents.Count} élément{(children.Count + documents.Count > 1 ? "s" : "")}";
         if (children.Count == 0 && documents.Count == 0) CourseCards.Children.Add(CreateEmptyStateButton());
@@ -311,13 +457,85 @@ public partial class MainWindow : Window
         content.Children.Add(new TextBlock { Text = File.Exists(document.StoredPath) ? "Cliquer pour ouvrir" : "Fichier introuvable", Foreground = new SolidColorBrush(Color.FromRgb(117, 128, 147)), FontSize = 12 });
         card.Content = content;
         card.ContextMenu = CreateDocumentMenu(document);
+        var dragStart = new Point();
+        card.PreviewMouseLeftButtonDown += (_, args) => dragStart = args.GetPosition(card);
+        card.PreviewMouseMove += (_, args) =>
+        {
+            if (args.LeftButton != MouseButtonState.Pressed) return;
+            var position = args.GetPosition(card);
+            if (Math.Abs(position.X - dragStart.X) < 8 && Math.Abs(position.Y - dragStart.Y) < 8) return;
+            DragDrop.DoDragDrop(card, document.Id, DragDropEffects.Move);
+        };
         card.Click += (_, _) => OpenDocument(document);
         return card;
     }
 
+    private void Section_DragOver(object sender, DragEventArgs e)
+    {
+        if (sender is Button button) button.Background = new SolidColorBrush(Color.FromRgb(48, 72, 104));
+        e.Effects = e.Data.GetDataPresent(DataFormats.StringFormat) || e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void Section_Drop(object sender, DragEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not string sectionId) return;
+        button.Background = sectionId == selectedSectionId ? new SolidColorBrush(Color.FromRgb(42, 56, 80)) : Brushes.Transparent;
+        if (e.Data.GetDataPresent(DataFormats.StringFormat) && e.Data.GetData(DataFormats.StringFormat) is string documentId)
+        {
+            var document = library.Documents.FirstOrDefault(item => item.Id == documentId);
+            if (document is not null) MoveDocumentToSection(document, sectionId);
+        }
+        else if (e.Data.GetDataPresent(DataFormats.FileDrop) && e.Data.GetData(DataFormats.FileDrop) is string[] paths)
+        {
+            selectedSectionId = sectionId;
+            ImportFiles(paths.Where(File.Exists));
+        }
+        e.Handled = true;
+    }
+
+    private void MoveDocumentToSection(StudyDocument document, string sectionId)
+    {
+        try
+        {
+            if (document.SectionId == sectionId) return;
+            var destinationFolder = GetSectionFolder(sectionId);
+            Directory.CreateDirectory(destinationFolder);
+            var destination = Path.Combine(destinationFolder, Path.GetFileName(document.StoredPath));
+            if (File.Exists(document.StoredPath) && !string.Equals(Path.GetFullPath(document.StoredPath), Path.GetFullPath(destination), StringComparison.OrdinalIgnoreCase))
+            {
+                destination = GetUniquePath(destinationFolder, Path.GetFileName(document.StoredPath));
+                try
+                {
+                    File.Move(document.StoredPath, destination);
+                }
+                catch (IOException)
+                {
+                    File.Copy(document.StoredPath, destination);
+                    File.Delete(document.StoredPath);
+                }
+                document.StoredPath = destination;
+            }
+            document.SectionId = sectionId;
+            SaveLibrary();
+            RenderSections();
+            RenderDocuments();
+        }
+        catch (Exception error)
+        {
+            MessageBox.Show($"Le document n'a pas pu être déplacé : {error.Message}", "Déplacement impossible", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void RenderRecentFiles(IEnumerable<StudyDocument> documents)
     {
-        foreach (var document in documents.OrderByDescending(document => document.AddedAt).Take(12))
+        var recentDocuments = documents.OrderByDescending(document => document.AddedAt).Take(12).ToList();
+        if (recentDocuments.Count == 0)
+        {
+            RecentFiles.Children.Add(new TextBlock { Text = "Aucun fichier récent", Foreground = new SolidColorBrush(Color.FromRgb(117, 128, 147)), FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
+            return;
+        }
+        foreach (var document in recentDocuments)
         {
             var recent = new Button { Content = "▧  " + document.Name, Tag = document, HorizontalContentAlignment = HorizontalAlignment.Left, Background = Brushes.Transparent, Foreground = new SolidColorBrush(Color.FromRgb(24, 33, 47)), Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 12), ToolTip = "Ouvrir le fichier" };
             recent.ContextMenu = CreateDocumentMenu(document);
@@ -326,10 +544,52 @@ public partial class MainWindow : Window
         }
     }
 
+    private bool SectionMatches(StudySection section, string query) =>
+        section.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || section.Notes.Contains(query, StringComparison.OrdinalIgnoreCase);
+
+    private bool DocumentMatches(StudyDocument document, string query) =>
+        document.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || GetDocumentText(document).Contains(query, StringComparison.OrdinalIgnoreCase);
+
+    private string GetDocumentText(StudyDocument document)
+    {
+        if (!File.Exists(document.StoredPath)) return string.Empty;
+        try
+        {
+            var lastWrite = File.GetLastWriteTimeUtc(document.StoredPath);
+            if (documentTextCache.TryGetValue(document.StoredPath, out var cached) && cached.LastWrite == lastWrite) return cached.Text;
+            var extension = Path.GetExtension(document.StoredPath).ToLowerInvariant();
+            string text;
+            if (extension is ".txt" or ".md" or ".csv" or ".json") text = File.ReadAllText(document.StoredPath);
+            else if (extension == ".pdf")
+            {
+                using var pdf = PdfDocument.Open(document.StoredPath);
+                text = string.Join(Environment.NewLine, pdf.GetPages().Select(page => page.Text));
+            }
+            else if (extension is ".docx" or ".pptx" or ".xlsx")
+            {
+                using var archive = ZipFile.OpenRead(document.StoredPath);
+                var xmlEntries = archive.Entries.Where(entry => entry.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
+                text = string.Join(" ", xmlEntries.Select(entry =>
+                {
+                    using var stream = entry.Open();
+                    var xml = XDocument.Load(stream);
+                    return string.Join(" ", xml.Descendants().Where(node => node.Name.LocalName is "t" or "v" or "text").Select(node => node.Value));
+                }));
+            }
+            else text = string.Empty;
+            documentTextCache[document.StoredPath] = (lastWrite, text);
+            return text;
+        }
+        catch
+        {
+        }
+        return string.Empty;
+    }
+
     private void UpdateScheduleSummary()
     {
         var now = DateTime.Now;
-        var next = library.Schedule.Select(entry => (Entry: entry, When: NextOccurrence(entry, now))).Where(item => item.When is not null).OrderBy(item => item.When).FirstOrDefault();
+        var next = library.Schedule.Where(entry => entry.WeekType is "Toutes" or null || entry.WeekType == CurrentWeekType()).Select(entry => (Entry: entry, When: NextOccurrence(entry, now))).Where(item => item.When is not null).OrderBy(item => item.When).FirstOrDefault();
         if (next.Entry is null)
         {
             NextClassText.Text = "▦  Aucun cours programmé\nAjoute ton emploi du temps depuis la barre latérale.";
@@ -341,6 +601,15 @@ public partial class MainWindow : Window
         NextClassText.Text = remaining.TotalMinutes <= 60
             ? $"⏰  Prochain cours : {label} à {next.When:HH\\:mm}\nPense à relire le cours avant de partir."
             : $"▦  Prochain cours : {label}\n{DayLabel(next.When.Value)}, {next.When:HH\\:mm}";
+        if (remaining.TotalMinutes is > 0 and <= CourseNotificationLeadMinutes)
+        {
+            var key = $"{next.Entry.Day}-{next.Entry.StartMinutes}-{next.Entry.Subject}-{next.When:yyyyMMddHHmm}";
+            if (lastCourseNotification != key)
+            {
+                trayIcon.ShowBalloonTip(6000, "Coursia · cours dans 15 min", $"{label} commence à {next.When:HH\\:mm}. Pense à relire le cours.", System.Windows.Forms.ToolTipIcon.Info);
+                lastCourseNotification = key;
+            }
+        }
     }
 
     private static DateTime? NextOccurrence(TimetableEntry entry, DateTime now)
@@ -354,6 +623,8 @@ public partial class MainWindow : Window
         }
         return null;
     }
+
+    private static string CurrentWeekType() => System.Globalization.ISOWeek.GetWeekOfYear(DateTime.Today) % 2 == 0 ? "B" : "A";
 
     private static string DayLabel(DateTime date) => date.Date == DateTime.Today ? "Aujourd'hui" : date.ToString("dddd", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"));
 
@@ -504,7 +775,7 @@ public partial class MainWindow : Window
         var documentsFolder = GetSectionFolder(sectionId);
         Directory.CreateDirectory(documentsFolder);
         var importedCount = 0;
-        foreach (var sourcePath in sourcePaths)
+        foreach (var sourcePath in sourcePaths.Where(File.Exists))
         {
             try
             {
@@ -559,6 +830,7 @@ public partial class MainWindow : Window
         var section = new StudySection { Name = name, Icon = dialog.SelectedIcon, Color = dialog.SelectedColor };
         library.Sections.Add(section);
         selectedSectionId = section.Id;
+        PageTitle.Text = section.Name;
         SaveLibrary();
         RenderSections();
         RenderDocuments();
@@ -574,6 +846,7 @@ public partial class MainWindow : Window
         library.Sections.Add(new StudySection { Name = name, ParentId = selectedSectionId, Icon = dialog.SelectedIcon, Color = dialog.SelectedColor });
         SaveLibrary();
         RenderSections();
+        RenderDocuments();
     }
 
     private void OpenDocument(StudyDocument document)
@@ -626,10 +899,14 @@ public partial class MainWindow : Window
     }
 
     private void RecentFile_Click(object sender, RoutedEventArgs e) => OpenDocument((StudyDocument)((Button)sender).Tag);
-    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => RenderDocuments();
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        searchTimer.Stop();
+        searchTimer.Start();
+    }
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        var settings = new SettingsWindow(library.AccentColor, library.AppIcon, compactMode, showFileExtensions) { Owner = this };
+        var settings = new SettingsWindow(library.AccentColor, library.AppIcon, compactMode, showFileExtensions, library.UserName) { Owner = this };
         if (settings.ShowDialog() != true) return;
         if (settings.ResetRequested)
         {
@@ -641,6 +918,11 @@ public partial class MainWindow : Window
             ExportBackup();
             return;
         }
+        if (settings.RestoreRequested)
+        {
+            RestoreBackup();
+            return;
+        }
         if (settings.ReplayTutorial)
         {
             ShowTutorial();
@@ -650,19 +932,17 @@ public partial class MainWindow : Window
         library.AppIcon = settings.AppIconValue;
         library.CompactMode = settings.IsCompact;
         library.ShowFileExtensions = settings.ShowFileExtensions;
+        library.UserName = settings.UserName;
         compactMode = settings.IsCompact;
         showFileExtensions = settings.ShowFileExtensions;
         ApplySettings();
+        UpdateGreeting();
         SaveLibrary();
         RenderDocuments();
     }
 
     private void Schedule_Click(object sender, RoutedEventArgs e)
     {
-        if (!string.IsNullOrWhiteSpace(library.SchedulePdfPath) && File.Exists(library.SchedulePdfPath))
-        {
-            Process.Start(new ProcessStartInfo { FileName = library.SchedulePdfPath, UseShellExecute = true });
-        }
         var schedule = new ScheduleWindow(library, SaveLibrary, UpdateScheduleSummary, ChooseStorageFolder) { Owner = this };
         schedule.ShowDialog();
         UpdateScheduleSummary();
@@ -672,12 +952,22 @@ public partial class MainWindow : Window
     {
         try
         {
+            foreach (var document in library.Documents)
+            {
+                try { if (File.Exists(document.StoredPath)) File.Delete(document.StoredPath); } catch { }
+            }
+            try { if (File.Exists(library.SchedulePdfPath)) File.Delete(library.SchedulePdfPath); } catch { }
             if (Directory.Exists(dataFolder)) Directory.Delete(dataFolder, true);
             library = new LibraryData();
             selectedSectionId = null;
+            UpdateGreeting();
             compactMode = false;
+            showFileExtensions = false;
             SearchBox.Clear();
             ApplySettings();
+            ApplyPowerMode();
+            UpdateBatteryStatus();
+            PageTitle.Text = "Vue d'ensemble";
             RenderSections();
             RenderDocuments();
             MessageBox.Show("Coursia a été réinitialisé.", "Réinitialisation terminée", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -703,11 +993,73 @@ public partial class MainWindow : Window
             }
             if (File.Exists(dialog.FileName)) File.Delete(dialog.FileName);
             ZipFile.CreateFromDirectory(dataFolder, dialog.FileName, CompressionLevel.Optimal, false);
+            using (var archive = ZipFile.Open(dialog.FileName, ZipArchiveMode.Update))
+            {
+                var fileMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var path in library.Documents.Select(document => document.StoredPath).Append(library.SchedulePdfPath).Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path)).Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    var entryName = $"files/{Guid.NewGuid():N}{Path.GetExtension(path)}";
+                    archive.CreateEntryFromFile(path, entryName, CompressionLevel.Optimal);
+                    fileMap[entryName] = path;
+                }
+                var mapEntry = archive.CreateEntry("files-map.json");
+                using var writer = new StreamWriter(mapEntry.Open());
+                writer.Write(JsonSerializer.Serialize(fileMap));
+            }
             MessageBox.Show("La sauvegarde a été créée avec succès.", "Sauvegarde Coursia", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception error)
         {
             MessageBox.Show($"La sauvegarde n'a pas pu être créée : {error.Message}", "Coursia", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void RestoreBackup()
+    {
+        var dialog = new OpenFileDialog { Title = "Restaurer une sauvegarde Coursia", Filter = "Archive ZIP|*.zip", Multiselect = false };
+        if (dialog.ShowDialog() != true) return;
+        if (MessageBox.Show("La restauration remplacera les données actuelles de Coursia. Continuer ?", "Restaurer Coursia", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        var temporaryFolder = Path.Combine(Path.GetTempPath(), "Coursia-restore-" + Guid.NewGuid().ToString("N"));
+        var previousFolder = dataFolder + "-before-restore-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            ZipFile.ExtractToDirectory(dialog.FileName, temporaryFolder);
+            if (!File.Exists(Path.Combine(temporaryFolder, "library.json"))) throw new InvalidDataException("Cette archive ne contient pas une bibliothèque Coursia valide.");
+            if (Directory.Exists(dataFolder)) Directory.Move(dataFolder, previousFolder);
+            Directory.Move(temporaryFolder, dataFolder);
+            if (Directory.Exists(previousFolder)) Directory.Delete(previousFolder, true);
+            library = new LibraryData();
+            LoadLibrary();
+            RestoreBackupFiles(dataFolder);
+            compactMode = library.CompactMode;
+            showFileExtensions = library.ShowFileExtensions;
+            selectedSectionId = null;
+            ApplySettings();
+            ApplyPowerMode();
+            RenderSections();
+            RenderDocuments();
+            UpdateScheduleSummary();
+            MessageBox.Show("La sauvegarde a été restaurée.", "Restauration terminée", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception error)
+        {
+            if (Directory.Exists(temporaryFolder)) Directory.Delete(temporaryFolder, true);
+            if (!Directory.Exists(dataFolder) && Directory.Exists(previousFolder)) Directory.Move(previousFolder, dataFolder);
+            MessageBox.Show($"La restauration a échoué : {error.Message}", "Restauration impossible", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void RestoreBackupFiles(string backupFolder)
+    {
+        var mapPath = Path.Combine(backupFolder, "files-map.json");
+        if (!File.Exists(mapPath)) return;
+        var fileMap = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(mapPath)) ?? new();
+        foreach (var pair in fileMap)
+        {
+            var source = Path.Combine(backupFolder, pair.Key.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(source)) continue;
+            Directory.CreateDirectory(Path.GetDirectoryName(pair.Value)!);
+            File.Copy(source, pair.Value, true);
         }
     }
     private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -749,7 +1101,9 @@ public sealed class LibraryData
     public string SchedulePdfPath { get; set; } = "";
     public bool PowerSavingMode { get; set; }
     public bool ShowFileExtensions { get; set; }
+    public string UserName { get; set; } = "";
     public List<TimetableEntry> Schedule { get; set; } = new();
+    public int ScheduleParserVersion { get; set; }
 }
 
 public sealed class TimetableEntry
@@ -758,6 +1112,7 @@ public sealed class TimetableEntry
     public int StartMinutes { get; set; }
     public int EndMinutes { get; set; }
     public string Subject { get; set; } = "";
+    public string WeekType { get; set; } = "Toutes";
 }
 
 public sealed class StudySection
@@ -772,6 +1127,7 @@ public sealed class StudySection
 
 public sealed class StudyDocument
 {
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "";
     public string Extension { get; set; } = "";
     public string StoredPath { get; set; } = "";

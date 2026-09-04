@@ -1,4 +1,4 @@
-# Coursia v0.2
+# Coursia v0.3
 
 Application Windows native et légère pour organiser ses cours et documents.
 
@@ -20,7 +20,7 @@ L'executable sera dans `bin/Release/net9.0-windows/win-x64/publish/`.
 
 ## Installer Coursia
 
-L'installateur Windows est disponible dans `installer-output/Coursia-Setup-v0.2.exe`.
+L'installateur Windows est disponible dans `installer-output/Coursia-Setup-v0.3.exe`.
 Il crée les raccourcis, installe Coursia dans le profil utilisateur et ajoute la désinstallation Windows.
 Les cours et préférences de `%LocalAppData%\\Coursia` sont conservés lors de la désinstallation.
 
@@ -42,6 +42,12 @@ iscc installer.iss
 - Sélecteur visuel de format avec repères Word et PowerPoint
 - Réinitialisation complète depuis les paramètres, avec confirmation
 - Export d'une sauvegarde complète `.zip` depuis les paramètres
+- Restauration sécurisée d'une sauvegarde `.zip` depuis les paramètres
+- Lecture automatique des horaires dans les PDF textuels d'emploi du temps
+- Notifications Windows avant les cours à venir
+- Notifications persistantes via une tâche Windows, même quand la fenêtre est fermée
+- Déplacement des documents par glisser-déposer sur une matière
+- Recherche complète dans les noms, notes et contenus PDF, texte et documents Office
 - Copie locale des documents importés pour les retrouver après redémarrage
 - Sauvegarde automatique de la bibliothèque dans `%LocalAppData%\\Coursia\\library.json`
 - Ouverture des documents avec l'application Windows associée
@@ -60,12 +66,22 @@ iscc installer.iss
 - Suppression sécurisée d'une matière avec ses sous-sections et fichiers copiés
 - Mode compact pour afficher davantage de matières à l'écran
 - Interface native Windows sans serveur web ni navigateur embarqué
-- Barre latérale v0.2 avec liste défilante et état vide lisible
+- Barre latérale v0.3 avec liste défilante et état vide lisible
 - Interface WPF native conservée pour limiter la mémoire et la consommation en arrière-plan
-- Démarrage vérifié sur l'exécutable publié v0.2
+- Démarrage vérifié sur l'exécutable publié v0.3
 - Génération PowerPoint corrigée avec une structure Open XML complète
 - Indicateur batterie/secteur dans la barre latérale
 - Mode économie Coursia activable en un clic, sans modifier les réglages Windows
+- Mode économie renforcé avec Power Throttling Windows et restauration automatique du plan précédent
+- Nom utilisateur demandé au premier démarrage et modifiable depuis les paramètres
+- Planning affichable en liste ou en vue semaine
+- Créneaux affectables aux semaines A, B ou à toutes les semaines, avec filtrage automatique selon la semaine actuelle
+- Réaffectation d’un cours importé à la semaine A, B ou à toutes les semaines depuis son menu contextuel
+- Fenêtres principale et emploi du temps agrandies pour les vues détaillées
+- Sauvegardes ZIP incluant les documents et le PDF d'emploi du temps
+- Recherche temporisée et cache local du contenu pour limiter les ralentissements
+- Feedback visuel lors du déplacement de fichiers sur une matière
+- Alerte explicite pour les PDF scannés sans couche de texte
 - Emploi du temps hebdomadaire avec reconnaissance locale des abréviations
 - Import du PDF d'emploi du temps, conservé dans le dossier choisi et ouvrable depuis Coursia
 - Alerte du prochain cours et rappel de relire le cours

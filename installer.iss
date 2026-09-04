@@ -1,5 +1,5 @@
 #define MyAppName "Coursia"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.3.0"
 #define MyAppPublisher "Coursia"
 #define PublishDir "bin\Release\net9.0-windows\win-x64\publish"
 
@@ -14,7 +14,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=installer-output
 SetupIconFile=icone.ico
-OutputBaseFilename=Coursia-Setup-v0.2
+OutputBaseFilename=Coursia-Setup-v0.3
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

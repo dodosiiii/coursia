@@ -30,3 +30,11 @@ C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\ScheduleWindow.baml
 C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\ScheduleWindow.g.cs
 C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\NotesWindow.baml
 C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\NotesWindow.g.cs
+C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\Coursia.csproj.AssemblyReference.cache
+C:\Users\dodo\Desktop\pour l'ecole\bin\Debug\net9.0-windows\icone.ico
+C:\Users\dodo\Desktop\pour l'ecole\bin\Debug\net9.0-windows\UglyToad.PdfPig.dll
+C:\Users\dodo\Desktop\pour l'ecole\bin\Debug\net9.0-windows\UglyToad.PdfPig.Core.dll
+C:\Users\dodo\Desktop\pour l'ecole\bin\Debug\net9.0-windows\UglyToad.PdfPig.Fonts.dll
+C:\Users\dodo\Desktop\pour l'ecole\bin\Debug\net9.0-windows\UglyToad.PdfPig.Tokenization.dll
+C:\Users\dodo\Desktop\pour l'ecole\bin\Debug\net9.0-windows\UglyToad.PdfPig.Tokens.dll
+C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\Coursia.csproj.Up2Date

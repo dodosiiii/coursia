@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Coursia")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c1da2fbdc06f5c0d1c8af58bc6fbbeafef54da7c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2b7bf4a5d7d4d285f48878ba0a5025edb1bcc045")]
 [assembly: System.Reflection.AssemblyProductAttribute("Coursia")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Coursia")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
