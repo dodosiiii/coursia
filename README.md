@@ -1,0 +1,51 @@
+# Coursia v0.1
+
+Application Windows native et légère pour organiser ses cours et documents.
+
+## Lancer l'application
+
+Dans le dossier du projet :
+
+```powershell
+dotnet run
+```
+
+Pour produire un executable Windows :
+
+```powershell
+dotnet publish -c Release -r win-x64 --self-contained true
+```
+
+L'executable sera dans `bin/Release/net9.0-windows/win-x64/publish/`.
+
+## Fonctions
+
+- Sections de cours dans la barre latérale
+- Création de sections et sous-sections
+- Import multiple de PDF, Word, PowerPoint, tableurs, images et fichiers texte
+- Création de vrais fichiers Word `.docx`, PowerPoint `.pptx` et texte `.txt`
+- Choix du dossier de stockage au premier import ou à la première création
+- Enregistrement automatique dans le dossier de la matière et de la sous-section active
+- Sélecteur visuel de format avec repères Word et PowerPoint
+- Réinitialisation complète depuis les paramètres, avec confirmation
+- Copie locale des documents importés pour les retrouver après redémarrage
+- Sauvegarde automatique de la bibliothèque dans `%LocalAppData%\\Coursia\\library.json`
+- Ouverture des documents avec l'application Windows associée
+- Recherche instantanée dans les cours
+- Vue des documents récents
+- Clic sur la zone vide pour démarrer rapidement
+- Glisser-déposer de documents dans la fenêtre
+- Raccourcis `Ctrl+N` pour une matière et `Ctrl+O` pour un document
+- Tutoriel de découverte au premier lancement
+- Paramètres pour changer la couleur d'accent et l'icône affichée
+- Icône et couleur propres à chaque matière et sous-section
+- Clic droit sur une matière pour la renommer ou changer sa personnalisation
+- Clic droit sur un document pour l'ouvrir, afficher son emplacement ou le supprimer
+- Suppression sécurisée d'une matière avec ses sous-sections et fichiers copiés
+- Mode compact pour afficher davantage de matières à l'écran
+- Interface native Windows sans serveur web ni navigateur embarqué
+- Barre latérale v0.1 avec liste défilante et état vide lisible
+- Interface WPF native conservée pour limiter la mémoire et la consommation en arrière-plan
+- Indicateur batterie/secteur dans la barre latérale
+- Mode économie Coursia activable en un clic, sans modifier les réglages Windows
+"# coursia" 
