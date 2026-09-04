@@ -25,3 +25,8 @@ C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\SettingsWindow.g.cs
 C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\TutorialWindow.g.cs
 C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\CreateDocumentWindow.baml
 C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\CreateDocumentWindow.g.cs
+C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\Coursia.sourcelink.json
+C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\ScheduleWindow.baml
+C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\ScheduleWindow.g.cs
+C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\NotesWindow.baml
+C:\Users\dodo\Desktop\pour l'ecole\obj\Debug\net9.0-windows\NotesWindow.g.cs

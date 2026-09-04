@@ -10,11 +10,11 @@ none
 false
 TRACE;RELEASE;NET;NET9_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NET9_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
 C:\Users\dodo\Desktop\pour l'ecole\App.xaml
-5409872110
+71495539948
 
-8-2058635923
+10-1456560400
 200-1147531523
-CreateDocumentWindow.xaml;MainWindow.xaml;NameDialog.xaml;SettingsWindow.xaml;TutorialWindow.xaml;
+CreateDocumentWindow.xaml;MainWindow.xaml;NameDialog.xaml;NotesWindow.xaml;ScheduleWindow.xaml;SettingsWindow.xaml;TutorialWindow.xaml;
 
 False
 

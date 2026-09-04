@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private LibraryData library = new();
     private string? selectedSectionId;
     private bool compactMode;
+    private bool showFileExtensions;
     private readonly DispatcherTimer batteryTimer = new() { Interval = TimeSpan.FromSeconds(30) };
 
     [DllImport("kernel32.dll")]
@@ -42,13 +43,15 @@ public partial class MainWindow : Window
         dataFile = Path.Combine(dataFolder, "library.json");
         LoadLibrary();
         compactMode = library.CompactMode;
+        showFileExtensions = library.ShowFileExtensions;
         ApplySettings();
         ApplyPowerMode();
         UpdateBatteryStatus();
-        batteryTimer.Tick += (_, _) => UpdateBatteryStatus();
+        batteryTimer.Tick += (_, _) => { UpdateBatteryStatus(); UpdateScheduleSummary(); };
         batteryTimer.Start();
         RenderSections();
         RenderDocuments();
+        UpdateScheduleSummary();
     }
 
     private void LoadLibrary()
@@ -98,7 +101,6 @@ public partial class MainWindow : Window
             blueBrush.Color = color;
             AddSubjectButton.Background = new SolidColorBrush(color);
         }
-        AppIcon.Text = string.IsNullOrWhiteSpace(library.AppIcon) ? "◈" : library.AppIcon;
     }
 
     private void UpdateBatteryStatus()
@@ -161,7 +163,7 @@ public partial class MainWindow : Window
 
     private void AddSectionButton(StudySection section, bool isSubsection)
     {
-        var button = new Button { Content = (isSubsection ? "   " : "") + section.Icon + "  " + section.Name, Tag = section.Id, HorizontalContentAlignment = HorizontalAlignment.Left, Background = section.Id == selectedSectionId ? new SolidColorBrush(Color.FromRgb(42, 56, 80)) : Brushes.Transparent, Foreground = new SolidColorBrush(isSubsection ? Color.FromRgb(159, 174, 196) : Color.FromRgb(224, 231, 241)), Padding = new Thickness(10, 8, 10, 8), Margin = isSubsection ? new Thickness(14, 0, 0, 2) : new Thickness(0, 0, 0, 2), FontSize = isSubsection ? 12 : 13, ToolTip = "Ouvrir " + section.Name };
+        var button = new Button { Content = new TextBlock { Text = (isSubsection ? "   " : "") + section.Icon + "  " + section.Name, TextTrimming = TextTrimming.CharacterEllipsis }, Tag = section.Id, HorizontalContentAlignment = HorizontalAlignment.Left, Background = section.Id == selectedSectionId ? new SolidColorBrush(Color.FromRgb(42, 56, 80)) : Brushes.Transparent, Foreground = new SolidColorBrush(isSubsection ? Color.FromRgb(159, 174, 196) : Color.FromRgb(224, 231, 241)), Padding = new Thickness(10, 8, 10, 8), Margin = isSubsection ? new Thickness(14, 0, 0, 2) : new Thickness(0, 0, 0, 2), FontSize = isSubsection ? 12 : 13, ToolTip = "Ouvrir " + section.Name };
         button.MouseEnter += (_, _) => { if (section.Id != selectedSectionId) button.Background = new SolidColorBrush(Color.FromRgb(32, 46, 67)); };
         button.MouseLeave += (_, _) => { if (section.Id != selectedSectionId) button.Background = Brushes.Transparent; };
         button.ContextMenu = CreateSectionMenu(section);
@@ -175,6 +177,9 @@ public partial class MainWindow : Window
         var customize = new MenuItem { Header = "Personnaliser" };
         customize.Click += (_, _) => CustomizeSection(section);
         menu.Items.Add(customize);
+        var notes = new MenuItem { Header = "Ouvrir les notes" };
+        notes.Click += (_, _) => EditNotes(section);
+        menu.Items.Add(notes);
         var delete = new MenuItem { Header = "Supprimer la matière" };
         delete.Click += (_, _) => DeleteSection(section);
         menu.Items.Add(delete);
@@ -188,10 +193,13 @@ public partial class MainWindow : Window
         open.Click += (_, _) => OpenDocument(document);
         var locate = new MenuItem { Header = "Afficher dans le dossier" };
         locate.Click += (_, _) => ShowInFolder(document);
+        var favorite = new MenuItem { Header = document.IsFavorite ? "Retirer des favoris" : "Ajouter aux favoris" };
+        favorite.Click += (_, _) => ToggleFavorite(document);
         var delete = new MenuItem { Header = "Supprimer de Coursia" };
         delete.Click += (_, _) => DeleteDocument(document);
         menu.Items.Add(open);
         menu.Items.Add(locate);
+        menu.Items.Add(favorite);
         menu.Items.Add(new Separator());
         menu.Items.Add(delete);
         return menu;
@@ -279,12 +287,27 @@ public partial class MainWindow : Window
         RenderDocuments();
     }
 
+    private void EditNotes(StudySection section)
+    {
+        var dialog = new NotesWindow(section) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        section.Notes = dialog.Notes;
+        SaveLibrary();
+    }
+
+    private void ToggleFavorite(StudyDocument document)
+    {
+        document.IsFavorite = !document.IsFavorite;
+        SaveLibrary();
+        RenderDocuments();
+    }
+
     private Button CreateDocumentCard(StudyDocument document)
     {
         var card = new Button { Width = compactMode ? 198 : 218, Height = compactMode ? 140 : 160, Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(230, 233, 239)), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 15, 15), Padding = new Thickness(compactMode ? 13 : 17), HorizontalContentAlignment = HorizontalAlignment.Left, VerticalContentAlignment = VerticalAlignment.Top, Tag = document, ToolTip = "Ouvrir le fichier" };
         var content = new StackPanel();
         content.Children.Add(new Border { Width = 38, Height = 38, CornerRadius = new CornerRadius(9), Background = new SolidColorBrush(Color.FromRgb(234, 247, 242)), Child = new TextBlock { Text = document.Extension, Foreground = new SolidColorBrush(Color.FromRgb(25, 124, 84)), FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } });
-        content.Children.Add(new TextBlock { Text = document.Name, FontSize = 15, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 14, 0, 3), Foreground = new SolidColorBrush(Color.FromRgb(24, 33, 47)) });
+        content.Children.Add(new TextBlock { Text = (document.IsFavorite ? "★  " : "") + (showFileExtensions ? $"{document.Name}.{document.Extension.ToLowerInvariant()}" : document.Name), FontSize = 15, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 14, 0, 3), Foreground = new SolidColorBrush(Color.FromRgb(24, 33, 47)) });
         content.Children.Add(new TextBlock { Text = File.Exists(document.StoredPath) ? "Cliquer pour ouvrir" : "Fichier introuvable", Foreground = new SolidColorBrush(Color.FromRgb(117, 128, 147)), FontSize = 12 });
         card.Content = content;
         card.ContextMenu = CreateDocumentMenu(document);
@@ -302,6 +325,40 @@ public partial class MainWindow : Window
             RecentFiles.Children.Add(recent);
         }
     }
+
+    private void UpdateScheduleSummary()
+    {
+        var now = DateTime.Now;
+        var next = library.Schedule.Select(entry => (Entry: entry, When: NextOccurrence(entry, now))).Where(item => item.When is not null).OrderBy(item => item.When).FirstOrDefault();
+        if (next.Entry is null)
+        {
+            NextClassText.Text = "▦  Aucun cours programmé\nAjoute ton emploi du temps depuis la barre latérale.";
+            return;
+        }
+        var subject = FindSubject(next.Entry.Subject);
+        var label = subject?.Name ?? next.Entry.Subject;
+        var remaining = next.When!.Value - now;
+        NextClassText.Text = remaining.TotalMinutes <= 60
+            ? $"⏰  Prochain cours : {label} à {next.When:HH\\:mm}\nPense à relire le cours avant de partir."
+            : $"▦  Prochain cours : {label}\n{DayLabel(next.When.Value)}, {next.When:HH\\:mm}";
+    }
+
+    private static DateTime? NextOccurrence(TimetableEntry entry, DateTime now)
+    {
+        for (var offset = 0; offset <= 7; offset++)
+        {
+            var date = now.Date.AddDays(offset);
+            if (date.DayOfWeek != entry.Day) continue;
+            var occurrence = date.AddMinutes(entry.StartMinutes);
+            if (occurrence > now) return occurrence;
+        }
+        return null;
+    }
+
+    private static string DayLabel(DateTime date) => date.Date == DateTime.Today ? "Aujourd'hui" : date.ToString("dddd", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"));
+
+    private StudySection? FindSubject(string value) => library.Sections.FirstOrDefault(section => Normalize(section.Name).Contains(Normalize(value), StringComparison.OrdinalIgnoreCase) || Normalize(value).Contains(Normalize(section.Name), StringComparison.OrdinalIgnoreCase) || Normalize(section.Name).Split(' ', '-', '.').Any(word => word.StartsWith(Normalize(value), StringComparison.OrdinalIgnoreCase)));
+    private static string Normalize(string value) => new string(value.Normalize().Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
     private Button CreateEmptyStateButton()
     {
@@ -427,7 +484,17 @@ public partial class MainWindow : Window
         AddZipEntry(archive, "ppt/presentation.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><p:presentation xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><p:sldMasterIdLst/><p:slideIdLst><p:sldId id=\"256\" r:id=\"rId1\"/></p:slideIdLst><p:sldSz cx=\"12192000\" cy=\"6858000\"/></p:presentation>");
         AddZipEntry(archive, "ppt/_rels/presentation.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" Target=\"slides/slide1.xml\"/></Relationships>");
         var safeTitle = System.Security.SecurityElement.Escape(title);
-        AddZipEntry(archive, "ppt/slides/slide1.xml", $"<?xml version=\"1.0\" encoding=\"UTF-8\"?><p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr/><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang=\"fr-FR\"/><a:t>{safeTitle}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>");
+            AddZipEntry(archive, "[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/ppt/presentation.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml\"/><Override PartName=\"/ppt/slideMasters/slideMaster1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml\"/><Override PartName=\"/ppt/slideLayouts/slideLayout1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml\"/><Override PartName=\"/ppt/theme/theme1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/><Override PartName=\"/ppt/slides/slide1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slide+xml\"/></Types>");
+            AddZipEntry(archive, "_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"ppt/presentation.xml\"/></Relationships>");
+            AddZipEntry(archive, "ppt/presentation.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><p:presentation xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"><p:sldMasterIdLst><p:sldMasterId id=\"2147483648\" r:id=\"rId1\"/></p:sldMasterIdLst><p:slideIdLst><p:sldId id=\"256\" r:id=\"rId2\"/></p:slideIdLst><p:sldSz cx=\"12192000\" cy=\"6858000\"/><p:notesSz cx=\"6858000\" cy=\"9144000\"/></p:presentation>");
+            AddZipEntry(archive, "ppt/_rels/presentation.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" Target=\"slideMasters/slideMaster1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" Target=\"slides/slide1.xml\"/></Relationships>");
+            AddZipEntry(archive, "ppt/slideMasters/slideMaster1.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><p:sldMaster xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld><p:sldLayoutIdLst><p:sldLayoutId id=\"1\" r:id=\"rId1\"/></p:sldLayoutIdLst><p:txStyles/><p:clrMap accent1=\"accent1\" accent2=\"accent2\" bg1=\"lt1\" tx1=\"dk1\"/></p:sldMaster>");
+            AddZipEntry(archive, "ppt/slideMasters/_rels/slideMaster1.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" Target=\"../slideLayouts/slideLayout1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"../theme/theme1.xml\"/></Relationships>");
+            AddZipEntry(archive, "ppt/slideLayouts/slideLayout1.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><p:sldLayout xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\" type=\"blank\"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>");
+            AddZipEntry(archive, "ppt/slideLayouts/_rels/slideLayout1.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" Target=\"../slideMasters/slideMaster1.xml\"/></Relationships>");
+            AddZipEntry(archive, "ppt/theme/theme1.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" name=\"Coursia\"><a:themeElements><a:clrScheme name=\"Coursia\"><a:dk1><a:sysClr val=\"windowText\" lastClr=\"000000\"/></a:dk1><a:lt1><a:sysClr val=\"window\" lastClr=\"FFFFFF\"/></a:lt1><a:accent1><a:srgbClr val=\"2563EB\"/></a:accent1><a:accent2><a:srgbClr val=\"16805B\"/></a:accent2></a:clrScheme><a:fontScheme name=\"Coursia\"><a:majorFont><a:latin typeface=\"Aptos Display\"/></a:majorFont><a:minorFont><a:latin typeface=\"Aptos\"/></a:minorFont></a:fontScheme><a:fmtScheme name=\"Coursia\"><a:fillStyleLst/><a:lnStyleLst/><a:effectStyleLst/><a:bgFillStyleLst/></a:fmtScheme></a:themeElements></a:theme>");
+            AddZipEntry(archive, "ppt/slides/slide1.xml", $"<?xml version=\"1.0\" encoding=\"UTF-8\"?><p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id=\"2\" name=\"Titre\"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x=\"914400\" y=\"914400\"/><a:ext cx=\"10668000\" cy=\"914400\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang=\"fr-FR\" sz=\"2800\"/><a:t>{safeTitle}</a:t></a:r></p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>");
+            AddZipEntry(archive, "ppt/slides/_rels/slide1.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" Target=\"../slideLayouts/slideLayout1.xml\"/></Relationships>");
     }
 
     private void ImportFiles(IEnumerable<string> sourcePaths)
@@ -562,11 +629,16 @@ public partial class MainWindow : Window
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => RenderDocuments();
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        var settings = new SettingsWindow(library.AccentColor, library.AppIcon, compactMode) { Owner = this };
+        var settings = new SettingsWindow(library.AccentColor, library.AppIcon, compactMode, showFileExtensions) { Owner = this };
         if (settings.ShowDialog() != true) return;
         if (settings.ResetRequested)
         {
             ResetApplication();
+            return;
+        }
+        if (settings.BackupRequested)
+        {
+            ExportBackup();
             return;
         }
         if (settings.ReplayTutorial)
@@ -577,10 +649,23 @@ public partial class MainWindow : Window
         library.AccentColor = settings.Accent;
         library.AppIcon = settings.AppIconValue;
         library.CompactMode = settings.IsCompact;
+        library.ShowFileExtensions = settings.ShowFileExtensions;
         compactMode = settings.IsCompact;
+        showFileExtensions = settings.ShowFileExtensions;
         ApplySettings();
         SaveLibrary();
         RenderDocuments();
+    }
+
+    private void Schedule_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(library.SchedulePdfPath) && File.Exists(library.SchedulePdfPath))
+        {
+            Process.Start(new ProcessStartInfo { FileName = library.SchedulePdfPath, UseShellExecute = true });
+        }
+        var schedule = new ScheduleWindow(library, SaveLibrary, UpdateScheduleSummary, ChooseStorageFolder) { Owner = this };
+        schedule.ShowDialog();
+        UpdateScheduleSummary();
     }
 
     private void ResetApplication()
@@ -600,6 +685,29 @@ public partial class MainWindow : Window
         catch (Exception error)
         {
             MessageBox.Show($"La réinitialisation a échoué : {error.Message}", "Coursia", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ExportBackup()
+    {
+        try
+        {
+            SaveLibrary();
+            var dialog = new SaveFileDialog { Title = "Enregistrer la sauvegarde Coursia", Filter = "Archive ZIP|*.zip", FileName = $"Coursia-sauvegarde-{DateTime.Now:yyyy-MM-dd}.zip", AddExtension = true };
+            if (dialog.ShowDialog() != true) return;
+            var sourceFolder = Path.GetFullPath(dataFolder).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (Path.GetFullPath(dialog.FileName).StartsWith(sourceFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("Choisis un emplacement différent du dossier interne de Coursia.", "Emplacement invalide", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (File.Exists(dialog.FileName)) File.Delete(dialog.FileName);
+            ZipFile.CreateFromDirectory(dataFolder, dialog.FileName, CompressionLevel.Optimal, false);
+            MessageBox.Show("La sauvegarde a été créée avec succès.", "Sauvegarde Coursia", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception error)
+        {
+            MessageBox.Show($"La sauvegarde n'a pas pu être créée : {error.Message}", "Coursia", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
     private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -638,7 +746,18 @@ public sealed class LibraryData
     public bool CompactMode { get; set; }
     public bool TutorialSeen { get; set; }
     public string StorageFolder { get; set; } = "";
+    public string SchedulePdfPath { get; set; } = "";
     public bool PowerSavingMode { get; set; }
+    public bool ShowFileExtensions { get; set; }
+    public List<TimetableEntry> Schedule { get; set; } = new();
+}
+
+public sealed class TimetableEntry
+{
+    public DayOfWeek Day { get; set; }
+    public int StartMinutes { get; set; }
+    public int EndMinutes { get; set; }
+    public string Subject { get; set; } = "";
 }
 
 public sealed class StudySection
@@ -648,6 +767,7 @@ public sealed class StudySection
     public string? ParentId { get; set; }
     public string Icon { get; set; } = "◈";
     public string Color { get; set; } = "#2563EB";
+    public string Notes { get; set; } = "";
 }
 
 public sealed class StudyDocument
@@ -657,4 +777,5 @@ public sealed class StudyDocument
     public string StoredPath { get; set; } = "";
     public string SectionId { get; set; } = "";
     public DateTimeOffset AddedAt { get; set; }
+    public bool IsFavorite { get; set; }
 }

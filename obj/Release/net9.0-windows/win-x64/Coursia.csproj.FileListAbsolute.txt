@@ -415,3 +415,8 @@ C:\Users\dodo\Desktop\pour l'ecole\obj\Release\net9.0-windows\win-x64\SettingsWi
 C:\Users\dodo\Desktop\pour l'ecole\obj\Release\net9.0-windows\win-x64\TutorialWindow.g.cs
 C:\Users\dodo\Desktop\pour l'ecole\obj\Release\net9.0-windows\win-x64\CreateDocumentWindow.baml
 C:\Users\dodo\Desktop\pour l'ecole\obj\Release\net9.0-windows\win-x64\CreateDocumentWindow.g.cs
+C:\Users\dodo\Desktop\pour l'ecole\obj\Release\net9.0-windows\win-x64\Coursia.sourcelink.json
+C:\Users\dodo\Desktop\pour l'ecole\obj\Release\net9.0-windows\win-x64\NotesWindow.baml
+C:\Users\dodo\Desktop\pour l'ecole\obj\Release\net9.0-windows\win-x64\ScheduleWindow.baml
+C:\Users\dodo\Desktop\pour l'ecole\obj\Release\net9.0-windows\win-x64\NotesWindow.g.cs
+C:\Users\dodo\Desktop\pour l'ecole\obj\Release\net9.0-windows\win-x64\ScheduleWindow.g.cs

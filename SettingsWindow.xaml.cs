@@ -8,16 +8,20 @@ public partial class SettingsWindow : Window
     public string Accent { get; private set; }
     public string AppIconValue { get; private set; }
     public bool IsCompact { get; private set; }
+    public bool ShowFileExtensions { get; private set; }
     public bool ReplayTutorial { get; private set; }
     public bool ResetRequested { get; private set; }
+    public bool BackupRequested { get; private set; }
 
-    public SettingsWindow(string accent, string icon, bool isCompact)
+    public SettingsWindow(string accent, string icon, bool isCompact, bool showFileExtensions)
     {
         InitializeComponent();
         Accent = accent;
         AppIconValue = icon;
         IsCompact = isCompact;
+        ShowFileExtensions = showFileExtensions;
         CompactMode.IsChecked = isCompact;
+        ShowExtensions.IsChecked = showFileExtensions;
         AccentPicker.SelectedValue = accent;
     }
 
@@ -39,10 +43,17 @@ public partial class SettingsWindow : Window
         DialogResult = true;
     }
 
+    private void Backup_Click(object sender, RoutedEventArgs e)
+    {
+        BackupRequested = true;
+        DialogResult = true;
+    }
+
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         Accent = AccentPicker.SelectedValue as string ?? "#2563EB";
         IsCompact = CompactMode.IsChecked == true;
+        ShowFileExtensions = ShowExtensions.IsChecked == true;
         DialogResult = true;
     }
 

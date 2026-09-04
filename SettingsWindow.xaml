@@ -29,9 +29,11 @@
                 <Button Tag="★" Content="★" Click="Icon_Click" Style="{StaticResource OptionButton}" />
             </WrapPanel>
             <CheckBox x:Name="CompactMode" Content="Mode compact : cartes et espaces plus petits" Margin="0,24,0,0" Foreground="#18212F" />
+            <CheckBox x:Name="ShowExtensions" Content="Afficher les extensions dans les cartes" Margin="0,12,0,0" Foreground="#18212F" />
             <Button Content="Revoir le tutoriel" HorizontalAlignment="Left" Background="Transparent" Foreground="#2563EB" Padding="0" Margin="0,18,0,0" Click="Tutorial_Click" />
             <Button Content="Réinitialiser toute l'application" HorizontalAlignment="Left" Background="Transparent" Foreground="#B42318" Padding="0" Margin="0,18,0,0" Click="Reset_Click" />
             <TextBlock Text="Supprime les matières, réglages et fichiers copiés par Coursia." Foreground="#758093" FontSize="11" Margin="0,5,0,0" />
+            <Button Content="Exporter une sauvegarde (.zip)" HorizontalAlignment="Left" Background="Transparent" Foreground="#2563EB" Padding="0" Margin="0,14,0,0" Click="Backup_Click" />
         </StackPanel>
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Annuler" Width="95" Background="Transparent" Foreground="#596579" Margin="0,0,8,0" Click="Cancel_Click" />
