@@ -1,0 +1,50 @@
+﻿<Window x:Class="Coursia.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Coursia v0.1" Height="760" Width="1320" MinHeight="620" MinWidth="1000"
+        Background="#F7F8FA" Foreground="#18212F" WindowStartupLocation="CenterScreen" Focusable="True" KeyDown="Window_KeyDown" AllowDrop="True" DragOver="Window_DragOver" Drop="Window_Drop" Loaded="Window_Loaded" Closing="Window_Closing">
+    <Window.Resources>
+        <SolidColorBrush x:Key="Muted" Color="#758093" />
+        <SolidColorBrush x:Key="Line" Color="#E6E9EF" />
+        <SolidColorBrush x:Key="Blue" Color="#2563EB" />
+        <Style TargetType="TextBlock"><Setter Property="FontFamily" Value="Segoe UI" /></Style>
+        <Style TargetType="Button"><Setter Property="FontFamily" Value="Segoe UI" /><Setter Property="Cursor" Value="Hand" /><Setter Property="Padding" Value="14,9" /><Setter Property="BorderThickness" Value="0" /></Style>
+    </Window.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="250" /><ColumnDefinition Width="*" /><ColumnDefinition Width="300" /></Grid.ColumnDefinitions>
+        <Border Grid.Column="0" Background="#18212F" Padding="20,24">
+            <Grid>
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <StackPanel Grid.Row="0">
+                    <Border BorderBrush="#2B3A50" BorderThickness="0,0,0,1" Padding="0,0,0,20" Margin="0,0,0,22"><Grid><StackPanel Orientation="Horizontal"><TextBlock x:Name="AppIcon" Text="◈" Foreground="#60A5FA" FontSize="24" FontWeight="Bold" Margin="0,0,8,0" /><StackPanel><TextBlock Text="coursia" Foreground="White" FontSize="24" FontWeight="Bold" /><TextBlock Text="v0.1" Foreground="#738198" FontSize="10" Margin="1,0,0,0" /></StackPanel></StackPanel><TextBlock Text="●" Foreground="#42D392" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center" ToolTip="Application prête" /></Grid></Border>
+                    <TextBlock Text="ton espace d'étude" Foreground="#9FAEC4" FontSize="12" Margin="1,0,0,28" />
+                    <TextBlock Text="BIBLIOTHÈQUE" Foreground="#738198" FontSize="10" FontWeight="SemiBold" Margin="0,0,0,10" />
+                    <Button Content="⌂   Vue d'ensemble" HorizontalContentAlignment="Left" Background="#2A3850" Foreground="White" Padding="12,10" Margin="0,0,0,8" Click="Overview_Click" />
+                    <TextBlock Text="MES MATIÈRES" Foreground="#738198" FontSize="10" FontWeight="SemiBold" Margin="0,18,0,10" />
+                </StackPanel>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,12"><StackPanel x:Name="SectionList" /></ScrollViewer>
+                <StackPanel Grid.Row="2">
+                    <Border Background="#202E43" CornerRadius="9" Padding="8" Margin="0,0,0,10"><StackPanel><Button Content="＋   Sous-section" HorizontalContentAlignment="Left" Background="Transparent" Foreground="#C5D0DF" Padding="8,7" Click="AddSubsection_Click" /><Button x:Name="AddSubjectButton" Content="＋   Ajouter une matière" HorizontalContentAlignment="Left" Background="#2563EB" Foreground="White" Padding="10,9" Click="AddSection_Click" /></StackPanel></Border>
+                    <Border Background="#202E43" CornerRadius="9" Padding="8" Margin="0,0,0,8"><Button x:Name="PowerButton" Background="Transparent" BorderThickness="0" Padding="6" HorizontalContentAlignment="Left" Click="PowerButton_Click" ToolTip="Active ou désactive le mode économie de Coursia"><StackPanel Orientation="Horizontal"><TextBlock x:Name="BatteryIcon" Text="⌁" Foreground="#42D392" FontSize="20" Margin="0,0,9,0" VerticalAlignment="Center" /><StackPanel><TextBlock x:Name="BatteryStatusText" Text="Batterie" Foreground="#E0E7F1" FontSize="12" FontWeight="SemiBold" /><TextBlock x:Name="PowerModeText" Text="Mode économie désactivé" Foreground="#9FAEC4" FontSize="10" Margin="0,2,0,0" /></StackPanel></StackPanel></Button></Border>
+                    <Button Content="⚙   Paramètres" HorizontalContentAlignment="Left" Background="Transparent" Foreground="#9FAEC4" Padding="8,8" Click="Settings_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+        <Grid Grid.Column="1" Margin="36,32,30,28">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,24,0"><Button x:Name="BackToOverviewButton" Content="←  Toutes les matières" HorizontalContentAlignment="Left" Background="Transparent" Foreground="{StaticResource Blue}" Padding="0" Margin="0,0,0,10" Visibility="Collapsed" Click="Overview_Click" /><TextBlock Text="Bonjour, Alex" FontSize="13" Foreground="{StaticResource Muted}" /><TextBlock x:Name="PageTitle" Text="Vue d'ensemble" FontSize="30" FontWeight="Bold" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" /></StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="7" Width="170" Height="38" Margin="0,0,8,0" ToolTip="Rechercher dans les matières et fichiers"><Grid><TextBlock Text="⌕" FontSize="21" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,0,2" /><TextBox x:Name="SearchBox" TextChanged="SearchBox_TextChanged" BorderThickness="0" Background="Transparent" Margin="38,0,8,0" VerticalContentAlignment="Center" /></Grid></Border>
+                    <Button Content="＋  Matière" Background="White" BorderBrush="{StaticResource Blue}" BorderThickness="1" Foreground="{StaticResource Blue}" Padding="10,9" Margin="0,0,6,0" Click="AddSection_Click" />
+                    <Button Content="＋  Créer" Background="{StaticResource Blue}" Foreground="White" Padding="10,9" Margin="0,0,6,0" Click="CreateDocument_Click" />
+                    <Button Content="↥  Importer" Background="White" BorderBrush="{StaticResource Blue}" BorderThickness="1" Foreground="{StaticResource Blue}" Padding="10,9" Click="AddFile_Click" />
+                </StackPanel>
+            </Grid>
+            <Border Grid.Row="1" Background="#EAF1FF" CornerRadius="12" Padding="22" Margin="0,30,0,25"><Grid><StackPanel><TextBlock Text="ESPACE PERSONNEL" Foreground="#4771C9" FontSize="11" FontWeight="Bold" /><TextBlock Text="Organise tes cours à ton rythme" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,3" /><TextBlock Text="Commence par créer une matière, puis ajoute ses documents." Foreground="{StaticResource Muted}" /></StackPanel><Button Content="Créer une matière  →" HorizontalAlignment="Right" VerticalAlignment="Center" Background="White" Foreground="#2563EB" Click="AddSection_Click" /></Grid></Border>
+            <Grid Grid.Row="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions><Grid Grid.Row="0" Margin="0,0,0,18"><TextBlock x:Name="CourseTitle" Text="Tes documents" FontSize="19" FontWeight="SemiBold" /><TextBlock x:Name="CourseCount" Text="0 document" HorizontalAlignment="Right" Foreground="{StaticResource Muted}" VerticalAlignment="Bottom" /></Grid><ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><WrapPanel x:Name="CourseCards" /></ScrollViewer></Grid>
+        </Grid>
+        <Border Grid.Column="2" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1,0,0,0" Padding="25,32"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><TextBlock Text="Aperçu rapide" FontSize="18" FontWeight="SemiBold" /><TextBlock Grid.Row="1" Text="Tes fichiers récents" Foreground="{StaticResource Muted}" Margin="0,5,0,22" /><ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="RecentFiles" /></ScrollViewer><Border Grid.Row="3" Background="#F7F8FA" CornerRadius="10" Padding="15" Margin="0,20,0,0"><StackPanel><TextBlock Text="Ton espace" FontWeight="SemiBold" /><TextBlock Text="Aucune donnée n'est envoyée sur internet." TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,7,0,0" /></StackPanel></Border></Grid></Border>
+    </Grid>
+</Window>

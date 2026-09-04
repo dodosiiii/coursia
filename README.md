@@ -18,6 +18,19 @@ dotnet publish -c Release -r win-x64 --self-contained true
 
 L'executable sera dans `bin/Release/net9.0-windows/win-x64/publish/`.
 
+## Installer Coursia
+
+L'installateur Windows est disponible dans `installer-output/Coursia-Setup-v0.1.exe`.
+Il crée les raccourcis, installe Coursia dans le profil utilisateur et ajoute la désinstallation Windows.
+Les cours et préférences de `%LocalAppData%\\Coursia` sont conservés lors de la désinstallation.
+
+Pour reconstruire l'installateur, installe Inno Setup puis exécute :
+
+```powershell
+dotnet publish -c Release -r win-x64 --self-contained true
+iscc installer.iss
+```
+
 ## Fonctions
 
 - Sections de cours dans la barre latérale

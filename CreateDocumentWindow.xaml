@@ -1,0 +1,28 @@
+<Window x:Class="Coursia.CreateDocumentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Nouveau fichier" Width="570" Height="390" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#F7F8FA">
+    <Window.Resources>
+        <Style x:Key="FileTypeButton" TargetType="RadioButton">
+            <Setter Property="Width" Value="112" /><Setter Property="Height" Value="92" /><Setter Property="Margin" Value="0,0,10,0" /><Setter Property="Padding" Value="8" /><Setter Property="Background" Value="White" /><Setter Property="BorderBrush" Value="#D7DDE7" /><Setter Property="BorderThickness" Value="1" />
+        </Style>
+    </Window.Resources>
+    <Grid Margin="28">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <TextBlock Text="Créer un nouveau fichier" FontSize="23" FontWeight="SemiBold" Foreground="#18212F" />
+        <TextBlock Grid.Row="1" Text="Choisis un format, puis donne un nom à ton fichier." Foreground="#758093" Margin="0,6,0,20" />
+        <StackPanel Grid.Row="2" Orientation="Horizontal">
+            <RadioButton x:Name="WordOption" GroupName="FileType" IsChecked="True" Style="{StaticResource FileTypeButton}">
+                <StackPanel HorizontalAlignment="Center"><TextBlock Text="W" FontSize="28" FontWeight="Bold" Foreground="#185ABD" HorizontalAlignment="Center" /><TextBlock Text="Document Word" FontSize="12" Foreground="#18212F" HorizontalAlignment="Center" /></StackPanel>
+            </RadioButton>
+            <RadioButton x:Name="PowerPointOption" GroupName="FileType" Style="{StaticResource FileTypeButton}">
+                <StackPanel HorizontalAlignment="Center"><TextBlock Text="P" FontSize="28" FontWeight="Bold" Foreground="#C43E1C" HorizontalAlignment="Center" /><TextBlock Text="Présentation" FontSize="12" Foreground="#18212F" HorizontalAlignment="Center" /></StackPanel>
+            </RadioButton>
+            <RadioButton x:Name="TextOption" GroupName="FileType" Style="{StaticResource FileTypeButton}">
+                <StackPanel HorizontalAlignment="Center"><TextBlock Text="TXT" FontSize="22" FontWeight="Bold" Foreground="#4B5563" HorizontalAlignment="Center" /><TextBlock Text="Texte simple" FontSize="12" Foreground="#18212F" HorizontalAlignment="Center" /></StackPanel>
+            </RadioButton>
+        </StackPanel>
+        <StackPanel Grid.Row="3" Margin="0,20,0,0"><TextBlock Text="Nom du fichier" FontWeight="SemiBold" Margin="0,0,0,7" /><TextBox x:Name="FileNameInput" Height="38" Padding="10,7" FontSize="14" VerticalContentAlignment="Center" BorderBrush="#D7DDE7" Background="White" /></StackPanel>
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0"><Button Content="Annuler" Width="95" Background="Transparent" Foreground="#596579" Margin="0,0,8,0" Click="Cancel_Click" /><Button Content="Créer le fichier" Width="125" Background="#2563EB" Foreground="White" Click="Create_Click" /></StackPanel>
+    </Grid>
+</Window>
