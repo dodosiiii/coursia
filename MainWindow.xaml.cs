@@ -36,7 +36,8 @@ namespace Coursia;
 
 public partial class MainWindow : Window
 {
-    private readonly string dataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Coursia");
+    private readonly string legacyDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Coursia");
+    private readonly string dataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Coursia");
     private readonly string dataFile;
     private LibraryData library = new();
     private string? selectedSectionId;
@@ -94,6 +95,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         trayIcon = new System.Windows.Forms.NotifyIcon { Visible = true, Text = "Coursia", Icon = LoadTrayIcon() };
+        MigrateLegacyDataIfNeeded();
         dataFile = Path.Combine(dataFolder, "library.json");
         LoadLibrary();
         RegisterNotificationTask();
@@ -116,6 +118,21 @@ public partial class MainWindow : Window
         if (library.ScheduleParserVersion >= 4 || string.IsNullOrWhiteSpace(library.SchedulePdfPath) || !File.Exists(library.SchedulePdfPath)) return;
         var scheduleWindow = new ScheduleWindow(library, SaveLibrary, UpdateScheduleSummary, ChooseStorageFolder);
         scheduleWindow.Close();
+    }
+
+    private void MigrateLegacyDataIfNeeded()
+    {
+        try
+        {
+            var legacyFile = Path.Combine(legacyDataFolder, "library.json");
+            var currentFile = Path.Combine(dataFolder, "library.json");
+            if (!File.Exists(legacyFile) || File.Exists(currentFile)) return;
+            Directory.CreateDirectory(dataFolder);
+            File.Copy(legacyFile, currentFile, overwrite: true);
+        }
+        catch
+        {
+        }
     }
 
     private static void RegisterNotificationTask()
@@ -191,7 +208,6 @@ public partial class MainWindow : Window
 
     private void ApplySettings()
     {
-        AppIconText.Text = library.AppIcon;
         if (TryParseColor(library.AccentColor, out var color) && Resources["Blue"] is SolidColorBrush blueBrush)
         {
             blueBrush.Color = color;
@@ -230,7 +246,15 @@ public partial class MainWindow : Window
     private System.Drawing.Icon LoadTrayIcon()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "icone.ico");
-        return File.Exists(path) ? new System.Drawing.Icon(path) : System.Drawing.SystemIcons.Application;
+        if (!File.Exists(path)) return System.Drawing.SystemIcons.Application;
+        try
+        {
+            return new System.Drawing.Icon(path);
+        }
+        catch
+        {
+            return System.Drawing.SystemIcons.Application;
+        }
     }
 
     private void ApplyPowerMode()
@@ -409,13 +433,21 @@ public partial class MainWindow : Window
     {
         var documentCount = library.Documents.Count(document => GetDescendantIds(section.Id).Contains(document.SectionId));
         var childCount = library.Sections.Count(item => item.ParentId == section.Id);
-        var card = new Button { Width = compactMode ? 198 : 218, Height = compactMode ? 132 : 150, Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(230, 233, 239)), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 15, 15), Padding = new Thickness(compactMode ? 13 : 17), HorizontalContentAlignment = HorizontalAlignment.Left, VerticalContentAlignment = VerticalAlignment.Top, Tag = section.Id, ToolTip = "Ouvrir cette matière" };
+        var card = new Button { Width = compactMode ? 220 : 252, Height = compactMode ? 165 : 190, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Margin = new Thickness(0, 0, 18, 18), Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch, Tag = section.Id, ToolTip = "Ouvrir cette matière" };
         var content = new StackPanel();
         var sectionColor = TryParseColor(section.Color, out var parsedColor) ? parsedColor : Colors.DodgerBlue;
-        content.Children.Add(new Border { Width = 38, Height = 38, CornerRadius = new CornerRadius(9), Background = new SolidColorBrush(Color.FromArgb(28, sectionColor.R, sectionColor.G, sectionColor.B)), Child = new TextBlock { Text = section.Icon, FontSize = 20, Foreground = new SolidColorBrush(sectionColor), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } });
-        content.Children.Add(new TextBlock { Text = section.Name, FontSize = 15, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 14, 0, 3), Foreground = new SolidColorBrush(Color.FromRgb(24, 33, 47)) });
-        content.Children.Add(new TextBlock { Text = $"{childCount} sous-section{(childCount > 1 ? "s" : "")} · {documentCount} fichier{(documentCount > 1 ? "s" : "")}", Foreground = new SolidColorBrush(Color.FromRgb(117, 128, 147)), FontSize = 12 });
-        card.Content = content;
+        var iconPanel = new Border { Width = compactMode ? 62 : 72, Height = compactMode ? 62 : 72, CornerRadius = new CornerRadius(20), Background = new SolidColorBrush(Color.FromArgb(42, sectionColor.R, sectionColor.G, sectionColor.B)), BorderBrush = new SolidColorBrush(Color.FromArgb(95, sectionColor.R, sectionColor.G, sectionColor.B)), BorderThickness = new Thickness(1), Child = new TextBlock { Text = section.Icon, FontSize = compactMode ? 34 : 40, Foreground = new SolidColorBrush(sectionColor), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+        content.Children.Add(iconPanel);
+        content.Children.Add(new TextBlock { Text = section.Name, FontSize = compactMode ? 15 : 17, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, MaxHeight = 46, Margin = new Thickness(0, 15, 0, 6), Foreground = new SolidColorBrush(Color.FromRgb(18, 32, 51)) });
+        content.Children.Add(new TextBlock { Text = $"{childCount} sous-section{(childCount > 1 ? "s" : "")}  ·  {documentCount} fichier{(documentCount > 1 ? "s" : "")}", Foreground = new SolidColorBrush(Color.FromRgb(102, 117, 138)), FontSize = 12 });
+        var cardGrid = new Grid();
+        cardGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(5) });
+        cardGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        cardGrid.Children.Add(new Border { Background = new SolidColorBrush(sectionColor), CornerRadius = new CornerRadius(16, 16, 0, 0) });
+        var cardBody = new Border { Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(220, 227, 236)), BorderThickness = new Thickness(1, 0, 1, 1), CornerRadius = new CornerRadius(0, 0, 16, 16), Padding = new Thickness(compactMode ? 16 : 19), Child = content, Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 12, ShadowDepth = 2, Opacity = 0.12, Color = Colors.Black } };
+        Grid.SetRow(cardBody, 1);
+        cardGrid.Children.Add(cardBody);
+        card.Content = cardGrid;
         card.ContextMenu = CreateSectionMenu(section);
         card.Click += Section_Click;
         return card;
@@ -450,12 +482,20 @@ public partial class MainWindow : Window
 
     private Button CreateDocumentCard(StudyDocument document)
     {
-        var card = new Button { Width = compactMode ? 198 : 218, Height = compactMode ? 140 : 160, Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(230, 233, 239)), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 15, 15), Padding = new Thickness(compactMode ? 13 : 17), HorizontalContentAlignment = HorizontalAlignment.Left, VerticalContentAlignment = VerticalAlignment.Top, Tag = document, ToolTip = "Ouvrir le fichier" };
+        var card = new Button { Width = compactMode ? 220 : 252, Height = compactMode ? 165 : 190, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Margin = new Thickness(0, 0, 18, 18), Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch, Tag = document, ToolTip = "Ouvrir le fichier" };
         var content = new StackPanel();
-        content.Children.Add(new Border { Width = 38, Height = 38, CornerRadius = new CornerRadius(9), Background = new SolidColorBrush(Color.FromRgb(234, 247, 242)), Child = new TextBlock { Text = document.Extension, Foreground = new SolidColorBrush(Color.FromRgb(25, 124, 84)), FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } });
-        content.Children.Add(new TextBlock { Text = (document.IsFavorite ? "★  " : "") + (showFileExtensions ? $"{document.Name}.{document.Extension.ToLowerInvariant()}" : document.Name), FontSize = 15, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 14, 0, 3), Foreground = new SolidColorBrush(Color.FromRgb(24, 33, 47)) });
-        content.Children.Add(new TextBlock { Text = File.Exists(document.StoredPath) ? "Cliquer pour ouvrir" : "Fichier introuvable", Foreground = new SolidColorBrush(Color.FromRgb(117, 128, 147)), FontSize = 12 });
-        card.Content = content;
+        var extensionColor = Color.FromRgb(15, 118, 110);
+        content.Children.Add(new Border { Width = compactMode ? 62 : 72, Height = compactMode ? 62 : 72, CornerRadius = new CornerRadius(20), Background = new SolidColorBrush(Color.FromArgb(35, extensionColor.R, extensionColor.G, extensionColor.B)), BorderBrush = new SolidColorBrush(Color.FromArgb(80, extensionColor.R, extensionColor.G, extensionColor.B)), BorderThickness = new Thickness(1), Child = new TextBlock { Text = document.Extension, FontSize = compactMode ? 17 : 20, Foreground = new SolidColorBrush(extensionColor), FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } });
+        content.Children.Add(new TextBlock { Text = (document.IsFavorite ? "★  " : "") + (showFileExtensions ? $"{document.Name}.{document.Extension.ToLowerInvariant()}" : document.Name), FontSize = compactMode ? 15 : 16, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, MaxHeight = 46, Margin = new Thickness(0, 15, 0, 6), Foreground = new SolidColorBrush(Color.FromRgb(18, 32, 51)) });
+        content.Children.Add(new TextBlock { Text = File.Exists(document.StoredPath) ? "Cliquer pour ouvrir" : "Fichier introuvable", Foreground = new SolidColorBrush(Color.FromRgb(102, 117, 138)), FontSize = 12 });
+        var fileGrid = new Grid();
+        fileGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(5) });
+        fileGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        fileGrid.Children.Add(new Border { Background = new SolidColorBrush(extensionColor), CornerRadius = new CornerRadius(16, 16, 0, 0) });
+        var fileBody = new Border { Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(220, 227, 236)), BorderThickness = new Thickness(1, 0, 1, 1), CornerRadius = new CornerRadius(0, 0, 16, 16), Padding = new Thickness(compactMode ? 16 : 19), Child = content, Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 12, ShadowDepth = 2, Opacity = 0.12, Color = Colors.Black } };
+        Grid.SetRow(fileBody, 1);
+        fileGrid.Children.Add(fileBody);
+        card.Content = fileGrid;
         card.ContextMenu = CreateDocumentMenu(document);
         var dragStart = new Point();
         card.PreviewMouseLeftButtonDown += (_, args) => dragStart = args.GetPosition(card);
@@ -589,6 +629,7 @@ public partial class MainWindow : Window
     private void UpdateScheduleSummary()
     {
         var now = DateTime.Now;
+        RenderTodayCourses(now);
         var next = library.Schedule.Where(entry => entry.WeekType is "Toutes" or null || entry.WeekType == CurrentWeekType()).Select(entry => (Entry: entry, When: NextOccurrence(entry, now))).Where(item => item.When is not null).OrderBy(item => item.When).FirstOrDefault();
         if (next.Entry is null)
         {
@@ -612,6 +653,33 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RenderTodayCourses(DateTime now)
+    {
+        TodayCourses.Children.Clear();
+        var courses = library.Schedule
+            .Where(entry => entry.Day == now.DayOfWeek && (entry.WeekType is "Toutes" or null || entry.WeekType == CurrentWeekType()))
+            .OrderBy(entry => entry.StartMinutes)
+            .ToList();
+        if (courses.Count == 0)
+        {
+            TodayCourses.Children.Add(new TextBlock { Text = "Aucun cours aujourd'hui", Foreground = new SolidColorBrush(Color.FromRgb(117, 128, 147)), FontSize = 12, Margin = new Thickness(0, 0, 0, 8) });
+            return;
+        }
+        foreach (var course in courses)
+        {
+            var week = course.WeekType is "A" or "B" ? $" · {course.WeekType}" : string.Empty;
+            var room = string.IsNullOrWhiteSpace(course.Location) ? string.Empty : $" · {course.Location}";
+            TodayCourses.Children.Add(new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(247, 248, 250)),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(9, 7, 9, 7),
+                Margin = new Thickness(0, 0, 0, 6),
+                Child = new TextBlock { Text = $"{FormatTime(course.StartMinutes)} - {FormatTime(course.EndMinutes)}  ·  {course.Subject}{room}{week}", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(24, 33, 47)), FontSize = 12 }
+            });
+        }
+    }
+
     private static DateTime? NextOccurrence(TimetableEntry entry, DateTime now)
     {
         for (var offset = 0; offset <= 7; offset++)
@@ -627,6 +695,7 @@ public partial class MainWindow : Window
     private static string CurrentWeekType() => System.Globalization.ISOWeek.GetWeekOfYear(DateTime.Today) % 2 == 0 ? "B" : "A";
 
     private static string DayLabel(DateTime date) => date.Date == DateTime.Today ? "Aujourd'hui" : date.ToString("dddd", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"));
+    private static string FormatTime(int minutes) => $"{minutes / 60:00}:{minutes % 60:00}";
 
     private StudySection? FindSubject(string value) => library.Sections.FirstOrDefault(section => Normalize(section.Name).Contains(Normalize(value), StringComparison.OrdinalIgnoreCase) || Normalize(value).Contains(Normalize(section.Name), StringComparison.OrdinalIgnoreCase) || Normalize(section.Name).Split(' ', '-', '.').Any(word => word.StartsWith(Normalize(value), StringComparison.OrdinalIgnoreCase)));
     private static string Normalize(string value) => new string(value.Normalize().Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
@@ -995,12 +1064,18 @@ public partial class MainWindow : Window
             ZipFile.CreateFromDirectory(dataFolder, dialog.FileName, CompressionLevel.Optimal, false);
             using (var archive = ZipFile.Open(dialog.FileName, ZipArchiveMode.Update))
             {
-                var fileMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var path in library.Documents.Select(document => document.StoredPath).Append(library.SchedulePdfPath).Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path)).Distinct(StringComparer.OrdinalIgnoreCase))
+                var fileMap = new List<BackupFileEntry>();
+                foreach (var document in library.Documents.Where(document => File.Exists(document.StoredPath)))
                 {
-                    var entryName = $"files/{Guid.NewGuid():N}{Path.GetExtension(path)}";
-                    archive.CreateEntryFromFile(path, entryName, CompressionLevel.Optimal);
-                    fileMap[entryName] = path;
+                    var entryName = $"files/{Guid.NewGuid():N}{Path.GetExtension(document.StoredPath)}";
+                    archive.CreateEntryFromFile(document.StoredPath, entryName, CompressionLevel.Optimal);
+                    fileMap.Add(new BackupFileEntry { EntryName = entryName, RelativePath = GetBackupRelativePath(document.StoredPath, library.StorageFolder, $"Documents/{document.Id}{Path.GetExtension(document.StoredPath)}"), DocumentId = document.Id });
+                }
+                if (File.Exists(library.SchedulePdfPath))
+                {
+                    var entryName = $"files/{Guid.NewGuid():N}{Path.GetExtension(library.SchedulePdfPath)}";
+                    archive.CreateEntryFromFile(library.SchedulePdfPath, entryName, CompressionLevel.Optimal);
+                    fileMap.Add(new BackupFileEntry { EntryName = entryName, RelativePath = "Emploi du temps/" + Path.GetFileName(library.SchedulePdfPath), IsSchedule = true });
                 }
                 var mapEntry = archive.CreateEntry("files-map.json");
                 using var writer = new StreamWriter(mapEntry.Open());
@@ -1053,14 +1128,32 @@ public partial class MainWindow : Window
     {
         var mapPath = Path.Combine(backupFolder, "files-map.json");
         if (!File.Exists(mapPath)) return;
-        var fileMap = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(mapPath)) ?? new();
-        foreach (var pair in fileMap)
+        var fileMap = JsonSerializer.Deserialize<List<BackupFileEntry>>(File.ReadAllText(mapPath)) ?? new();
+        if (fileMap.Count == 0) return;
+        if (string.IsNullOrWhiteSpace(library.StorageFolder) || !Directory.Exists(library.StorageFolder) && !ChooseStorageFolder()) return;
+        foreach (var item in fileMap)
         {
-            var source = Path.Combine(backupFolder, pair.Key.Replace('/', Path.DirectorySeparatorChar));
+            var source = Path.Combine(backupFolder, item.EntryName.Replace('/', Path.DirectorySeparatorChar));
             if (!File.Exists(source)) continue;
-            Directory.CreateDirectory(Path.GetDirectoryName(pair.Value)!);
-            File.Copy(source, pair.Value, true);
+            var destination = Path.Combine(library.StorageFolder!, item.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(source, destination, true);
+            if (item.IsSchedule) library.SchedulePdfPath = destination;
+            else if (item.DocumentId is not null)
+            {
+                var document = library.Documents.FirstOrDefault(document => document.Id == item.DocumentId);
+                if (document is not null) document.StoredPath = destination;
+            }
         }
+        SaveLibrary();
+    }
+
+    private static string GetBackupRelativePath(string path, string storageFolder, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(storageFolder)) return fallback;
+        var root = Path.GetFullPath(storageFolder).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var fullPath = Path.GetFullPath(path);
+        return fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase) ? Path.GetRelativePath(storageFolder, fullPath).Replace(Path.DirectorySeparatorChar, '/') : fallback;
     }
     private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
@@ -1112,6 +1205,7 @@ public sealed class TimetableEntry
     public int StartMinutes { get; set; }
     public int EndMinutes { get; set; }
     public string Subject { get; set; } = "";
+    public string Location { get; set; } = "";
     public string WeekType { get; set; } = "Toutes";
 }
 
@@ -1134,4 +1228,12 @@ public sealed class StudyDocument
     public string SectionId { get; set; } = "";
     public DateTimeOffset AddedAt { get; set; }
     public bool IsFavorite { get; set; }
+}
+
+public sealed class BackupFileEntry
+{
+    public string EntryName { get; set; } = "";
+    public string RelativePath { get; set; } = "";
+    public string? DocumentId { get; set; }
+    public bool IsSchedule { get; set; }
 }

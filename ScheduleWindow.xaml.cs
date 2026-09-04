@@ -55,8 +55,9 @@ public partial class ScheduleWindow : Window
         foreach (var entry in FilteredSchedule().OrderBy(item => item.Day).ThenBy(item => item.StartMinutes))
         {
             var subject = FindSubject(entry.Subject);
+            var location = string.IsNullOrWhiteSpace(entry.Location) ? string.Empty : $" · {entry.Location}";
             var weekLabel = entry.WeekType is "A" or "B" ? $" · Semaine {entry.WeekType}" : " · Toutes les semaines";
-            var item = new ListBoxItem { Content = $"{DayName(entry.Day)}  ·  {FormatTime(entry.StartMinutes)} - {FormatTime(entry.EndMinutes)}  ·  {entry.Subject}{weekLabel}{(subject is null ? "" : $"  →  {subject.Name}")}", Padding = new Thickness(12, 9, 12, 9), Background = Brushes.White, Margin = new Thickness(0, 0, 0, 6), Tag = entry };
+            var item = new ListBoxItem { Content = $"{DayName(entry.Day)}  ·  {FormatTime(entry.StartMinutes)} - {FormatTime(entry.EndMinutes)}  ·  {entry.Subject}{location}{weekLabel}{(subject is null ? "" : $"  →  {subject.Name}")}", Padding = new Thickness(12, 9, 12, 9), Background = Brushes.White, Margin = new Thickness(0, 0, 0, 6), Tag = entry };
             item.MouseDoubleClick += (_, _) => RemoveEntry(entry);
             var menu = new ContextMenu();
             foreach (var week in new[] { (Label: "Toutes les semaines", Value: "Toutes"), (Label: "Semaine A", Value: "A"), (Label: "Semaine B", Value: "B") })
@@ -83,7 +84,8 @@ public partial class ScheduleWindow : Window
             foreach (var entry in FilteredSchedule().Where(entry => entry.Day == days[column]).OrderBy(entry => entry.StartMinutes))
             {
                 var weekLabel = entry.WeekType is "A" or "B" ? $"Semaine {entry.WeekType}" : "Toutes";
-                panel.Children.Add(new Border { Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(215, 221, 231)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6), Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 6), Child = new TextBlock { Text = $"{FormatTime(entry.StartMinutes)}\n{entry.Subject}\n{weekLabel}", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(24, 33, 47)) } });
+                var location = string.IsNullOrWhiteSpace(entry.Location) ? string.Empty : $"\n{entry.Location}";
+                panel.Children.Add(new Border { Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(215, 221, 231)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6), Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 6), Child = new TextBlock { Text = $"{FormatTime(entry.StartMinutes)}\n{entry.Subject}{location}\n{weekLabel}", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(24, 33, 47)) } });
             }
             if (panel.Children.Count == 1) panel.Children.Add(new TextBlock { Text = "Aucun cours", Foreground = Brushes.Gray, FontSize = 11 });
             Grid.SetColumn(panel, column);
@@ -100,16 +102,18 @@ public partial class ScheduleWindow : Window
         }
         var day = Enum.Parse<DayOfWeek>((string)dayItem.Tag);
         var subject = SubjectInput.Text.Trim();
+        var location = LocationInput.Text.Trim();
         var weekType = (WeekPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? "Toutes";
-        if (library.Schedule.Any(item => item.Day == day && item.StartMinutes == (int)start.TotalMinutes && item.WeekType == weekType && item.Subject.Equals(subject, StringComparison.OrdinalIgnoreCase)))
+        if (library.Schedule.Any(item => item.Day == day && item.StartMinutes == (int)start.TotalMinutes && item.WeekType == weekType && item.Subject.Equals(subject, StringComparison.OrdinalIgnoreCase) && item.Location.Equals(location, StringComparison.OrdinalIgnoreCase)))
         {
             MessageBox.Show("Ce cours existe déjà à cet horaire.", "Emploi du temps", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        library.Schedule.Add(new TimetableEntry { Day = day, StartMinutes = (int)start.TotalMinutes, EndMinutes = (int)end.TotalMinutes, Subject = subject, WeekType = weekType });
+        library.Schedule.Add(new TimetableEntry { Day = day, StartMinutes = (int)start.TotalMinutes, EndMinutes = (int)end.TotalMinutes, Subject = subject, Location = location, WeekType = weekType });
         save();
         RenderEntries();
         refresh();
+        LocationInput.Text = string.Empty;
     }
 
     private void RemoveEntry(TimetableEntry entry)

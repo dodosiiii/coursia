@@ -33,7 +33,7 @@ internal static class NotificationRunner
 	public static void Run()
 	{
 		if (Process.GetProcessesByName("Coursia").Any(process => process.Id != Environment.ProcessId && process.MainWindowHandle != IntPtr.Zero)) return;
-		var dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Coursia", "library.json");
+		var dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Coursia", "library.json");
 		if (!File.Exists(dataFile)) return;
 		try
 		{

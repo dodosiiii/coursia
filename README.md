@@ -1,6 +1,10 @@
-# Coursia v0.3
+# Coursia v0.4
 
 Application Windows native et légère pour organiser ses cours et documents.
+
+## v0.4
+
+Refonte visuelle complète : espace plus aéré, cartes de matières et fichiers modernisées, boutons arrondis, recherche élargie, navigation plus lisible, palette bleu nuit et turquoise, et aperçu quotidien mieux hiérarchisé.
 
 ## Lancer l'application
 
@@ -57,7 +61,7 @@ iscc installer.iss
 - Glisser-déposer de documents dans la fenêtre
 - Raccourcis `Ctrl+N` pour une matière et `Ctrl+O` pour un document
 - Tutoriel de découverte au premier lancement
-- Paramètres pour changer la couleur d'accent et l'icône affichée
+- Paramètres pour changer la couleur d'accent et l'icône des matières
 - Icône Coursia personnalisée dans la fenêtre, l'exécutable et l'installateur
 - Option pour afficher les extensions des fichiers dans les cartes
 - Icône et couleur propres à chaque matière et sous-section
@@ -66,12 +70,12 @@ iscc installer.iss
 - Suppression sécurisée d'une matière avec ses sous-sections et fichiers copiés
 - Mode compact pour afficher davantage de matières à l'écran
 - Interface native Windows sans serveur web ni navigateur embarqué
-- Barre latérale v0.3 avec liste défilante et état vide lisible
+- Barre latérale v0.4 avec liste défilante et état vide lisible
 - Interface WPF native conservée pour limiter la mémoire et la consommation en arrière-plan
-- Démarrage vérifié sur l'exécutable publié v0.3
+- Démarrage vérifié sur l'exécutable publié v0.4
 - Génération PowerPoint corrigée avec une structure Open XML complète
 - Indicateur batterie/secteur dans la barre latérale
-- Mode économie Coursia activable en un clic, sans modifier les réglages Windows
+- Mode économie Coursia activable en un clic, avec restauration du plan Windows précédent
 - Mode économie renforcé avec Power Throttling Windows et restauration automatique du plan précédent
 - Nom utilisateur demandé au premier démarrage et modifiable depuis les paramètres
 - Planning affichable en liste ou en vue semaine
@@ -79,6 +83,8 @@ iscc installer.iss
 - Réaffectation d’un cours importé à la semaine A, B ou à toutes les semaines depuis son menu contextuel
 - Fenêtres principale et emploi du temps agrandies pour les vues détaillées
 - Sauvegardes ZIP incluant les documents et le PDF d'emploi du temps
+- Sauvegardes portables entre ordinateurs : les fichiers sont restaurés dans le dossier choisi sur le nouveau PC
+- La bibliothèque reste locale : pour transférer Coursia sur un autre PC, exporter puis restaurer la sauvegarde ZIP
 - Recherche temporisée et cache local du contenu pour limiter les ralentissements
 - Feedback visuel lors du déplacement de fichiers sur une matière
 - Alerte explicite pour les PDF scannés sans couche de texte
